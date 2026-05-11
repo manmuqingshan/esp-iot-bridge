@@ -379,9 +379,10 @@ const esp_netif_ip_info_t * esp_bridge_netif_get_net_segment_ip_prefix(void);
  *     // so the first valid network segment is 192.168.0.1, and the last valid network segment is 192.168.255.254.
  * @note After changing the prefix, bridge netifs may be re-allocated IPs if their current IPs do not fall within the new segment;
  *       see conflict check and esp_bridge_netif_network_segment_conflict_update.
+ * @note Prefix subnet must not intersect 0.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, or 224.0.0.0/4.
  * @return
  *     - ESP_OK: IP prefix initialized successfully.
- *     - ESP_ERR_INVALID_ARG: Invalid argument (NULL pointer, invalid mask, or invalid IP).
+ *     - ESP_ERR_INVALID_ARG: Invalid argument (NULL pointer, invalid mask, invalid IP, or prefix intersects forbidden ranges above).
  */
 esp_err_t esp_bridge_netif_set_net_segment_ip_prefix(esp_netif_ip_info_t *ip_info, bool save_to_nvs);
 

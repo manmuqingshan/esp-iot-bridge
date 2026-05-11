@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stddef.h>
 #include <time.h>
 #include <string.h>
 #include <sys/fcntl.h>
@@ -217,6 +218,43 @@ static __inline__ bool subnet_ip_is_valid(uint32_t mask, uint32_t ip)
     return true;
 }
 
+static bool ipv4_host_range_intersects(uint32_t a_lo, uint32_t a_hi, uint32_t b_lo, uint32_t b_hi)
+{
+    return !(a_hi < b_lo || a_lo > b_hi);
+}
+
+typedef struct {
+    uint32_t lo;
+    uint32_t hi;
+} ipv4_host_span_t;
+
+/* Same spans as esp_bridge_ipv4_host_order_is_special + subnet_prefix policy; one source for set. */
+static const ipv4_host_span_t s_ipv4_forbidden_prefix_spans[] = {
+    { 0x00000000U, 0x00FFFFFFU }, /* 0.0.0.0/8 */
+    { 0x7F000000U, 0x7FFFFFFFU }, /* 127.0.0.0/8 */
+    { 0xA9FE0000U, 0xA9FEFFFFU }, /* 169.254.0.0/16 RFC 3927 */
+    { 0xE0000000U, 0xFFFFFFFFU }, /* 224.0.0.0/4 */
+};
+
+/**
+ * True if prefix subnet [network, broadcast] intersects a forbidden span (see s_ipv4_forbidden_prefix_spans).
+ */
+static bool subnet_prefix_overlaps_forbidden_ranges(uint32_t mask_net, uint32_t ip_net)
+{
+    const uint32_t mask_host = ntohl(mask_net);
+    const uint32_t ip_host = ntohl(ip_net);
+    const uint32_t net_lo = ip_host & mask_host;
+    const uint32_t net_hi = net_lo | ~mask_host;
+
+    for (size_t i = 0; i < sizeof(s_ipv4_forbidden_prefix_spans) / sizeof(s_ipv4_forbidden_prefix_spans[0]); i++) {
+        const ipv4_host_span_t *s = &s_ipv4_forbidden_prefix_spans[i];
+        if (ipv4_host_range_intersects(net_lo, net_hi, s->lo, s->hi)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 const esp_netif_ip_info_t * esp_bridge_netif_get_net_segment_ip_prefix(void)
 {
     if (!net_segment_loaded_from_nvs) {
@@ -241,6 +279,11 @@ esp_err_t esp_bridge_netif_set_net_segment_ip_prefix(esp_netif_ip_info_t *ip_inf
     }
 
     if (!subnet_ip_is_valid(ip_info->netmask.addr, ip_info->ip.addr)) {
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (subnet_prefix_overlaps_forbidden_ranges(ip_info->netmask.addr, ip_info->ip.addr)) {
+        ESP_LOGE(TAG, "Prefix subnet must not intersect 0.0.0.0/8, 127.0.0.0/8, 169.254.0.0/16, or 224.0.0.0/4");
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -385,7 +428,7 @@ esp_err_t esp_bridge_netif_get_network_segment_info(uint32_t *start_ip, uint32_t
         return ESP_ERR_INVALID_ARG;
     }
 
-    uint32_t end_ip_tmp = prefix_network_host + ((1U << ip_zero_bits) - 1);
+    uint32_t end_ip_tmp = prefix_network_host + ((1UL << ip_zero_bits) - 1);
 
     if (end_ip_tmp < start_ip_tmp || end_ip_tmp == 0) {
         end_ip_tmp = 0xFFFFFFFF;
@@ -404,6 +447,28 @@ esp_err_t esp_bridge_netif_get_network_segment_info(uint32_t *start_ip, uint32_t
     return ESP_OK;
 }
 
+bool esp_bridge_ipv4_host_order_is_special(uint32_t ipv4_net)
+{
+    /* Same octet layout as lwIP ip4_addr_get_byte(): first wire octet at lowest address. */
+    const uint8_t *const p = (const uint8_t *)&ipv4_net;
+    const uint8_t o0 = p[0];
+    const uint8_t o1 = p[1];
+
+    if (o0 == 0U) {
+        return true; /* 0.0.0.0/8 "this network" */
+    }
+    if (o0 == 127U) {
+        return true; /* 127.0.0.0/8 loopback */
+    }
+    if (o0 == 169U && o1 == 254U) {
+        return true; /* 169.254.0.0/16 link-local */
+    }
+    if (o0 >= 224U) {
+        return true; /* 224.0.0.0/4 multicast, 240.0.0.0/4 reserved */
+    }
+    return false;
+}
+
 esp_err_t esp_bridge_netif_request_ip(esp_netif_t *netif, esp_netif_ip_info_t *ip_info)
 {
     bool ip_segment_is_used = true;
@@ -416,8 +481,12 @@ esp_err_t esp_bridge_netif_request_ip(esp_netif_t *netif, esp_netif_ip_info_t *i
     }
 
     for (uint32_t bridge_ip_host = start_ip; (bridge_ip_host >= start_ip) && (bridge_ip_host <= end_ip); bridge_ip_host += subnet_size) {
+        const uint32_t client_ip_net = htonl(bridge_ip_host + 1U);
         uint32_t bridge_ip_net = htonl(bridge_ip_host);
         esp_bridge_network_segment_custom_check_t *list = custom_check_list;
+        if (esp_bridge_ipv4_host_order_is_special(client_ip_net)) {
+            continue;
+        }
         ip_segment_is_used = esp_bridge_netif_network_segment_is_used(netif, bridge_ip_net);
         while (!ip_segment_is_used && list) {
             ip_segment_is_used = list->custom_check_cb(bridge_ip_net);

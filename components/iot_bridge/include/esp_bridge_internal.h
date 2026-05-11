@@ -82,6 +82,14 @@ esp_err_t _esp_bridge_netif_list_add(esp_netif_t *netif, dns_change_cb_t dns_cha
 esp_err_t esp_bridge_netif_list_remove(esp_netif_t *netif);
 
 /**
+ * @brief Whether an IPv4 in lwIP **network byte order** (same layout as ip4_addr_t.addr) is non-assignable (multicast, loopback, etc.).
+ *
+ * @param ipv4_net Address in network byte order, e.g. the value passed to esp_bridge_netif_network_segment_is_used() as segment base,
+ *                  or htonl(bridge_ip_host + 1) for the DHCP client address to be assigned.
+ */
+bool esp_bridge_ipv4_host_order_is_special(uint32_t ipv4_net);
+
+/**
  * @brief  Request to allocate an ip information that does not conflict with the existing netif ip network segment.
  *
  * @param[in]   netif   The netif for which to request IP (e.g. the DHCPS netif that will use this IP). Can be NULL.
