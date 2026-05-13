@@ -1,6 +1,6 @@
 # ChangeLog
 
-## v1.0.3-dev - 2026.04.28
+## v1.0.3-dev - 2026.05.11
 
 ### Breaking Change
 
@@ -13,7 +13,7 @@
 - feat(bridge_spi, bridge_sdio): When both Kconfig options are enabled, create **both** data-forwarding and external SPI/SDIO netifs; add `esp_bridge_spi_set_netif_type` / `esp_bridge_sdio_set_netif_type` (in `esp_bridge.h`) to select the active path ([98b3309](https://github.com/espressif/esp-iot-bridge/commit/98b33095fed681ffeeb6b3b84484eb9f33ed6816))
 - feat(bridge_common): DNS update path uses `BRIDGE_EVENT` and lwIP `netif` via `esp_netif_get_handle_from_netif_impl`, removing hard-coded external ifkeys for DHCP DNS sync ([c5a9742](https://github.com/espressif/esp-iot-bridge/commit/c5a9742d132d175f7a9c81a60732cb3fe43d0408))
 - feat: Add api to update netif changed cb ([9af64aa](https://github.com/espressif/esp-iot-bridge/commit/9af64aa70599ce2acbdf33e9d926813c3861f5c3))
-- feat: Support user to customize ip segment ([7aa26d6](https://github.com/espressif/esp-iot-bridge/commit/7aa26d6fbcf5e6419a2730f562a7804ea62b9323))
+- feat: Support user to customize ip segment ([7aa26d6](https://github.com/espressif/esp-iot-bridge/commit/7aa26d6fbcf5e6419a2730f562a7804ea62b9323))([d51e559](https://github.com/espressif/esp-iot-bridge/commit/d51e5593a63930c9babce066bdf312c156470792))
 - feat: set BRIDGE_WIFI_PMF_DISABLE default to n ([5803a16](https://github.com/espressif/esp-iot-bridge/commit/5803a16f3e21b21507f45cdd0037c5c1664eacc6))
 - feat(bridge_eth): support configurable MAC address for SPI Ethernet ([bd9aa48](https://github.com/espressif/esp-iot-bridge/commit/bd9aa480f64c8504323d00a7510392e1d8b6d4f2))
 
